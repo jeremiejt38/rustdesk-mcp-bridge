@@ -100,3 +100,28 @@ def test_send_key_single(controller: DesktopController) -> None:
 def test_send_key_combination(controller: DesktopController) -> None:
     controller.send_key("ctrl + a")
     controller._pyautogui.hotkey.assert_called_once_with("ctrl", "a")
+
+
+@patch("rustdesk_mcp_bridge.desktop.httpx.post")
+def test_describe_screen(mock_post: MagicMock, controller: DesktopController) -> None:
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"message": {"content": "A desktop with an open window."}}
+    mock_response.raise_for_status.return_value = None
+    mock_post.return_value = mock_response
+
+    raw_bgra = b"\xff\x00\x00\xff\x00\xff\x00\xff"
+    screenshot = MagicMock()
+    screenshot.size = (2, 1)
+    screenshot.bgra = raw_bgra
+    controller._mss.grab.return_value = screenshot
+
+    result = controller.describe_screen(
+        prompt="What do you see?",
+        model="llava:7b",
+        ollama_url="http://localhost:11434/api/chat",
+    )
+    assert result == "A desktop with an open window."
+    mock_post.assert_called_once()
+    call_kwargs = mock_post.call_args.kwargs
+    assert call_kwargs["json"]["model"] == "llava:7b"
+    assert call_kwargs["json"]["messages"][0]["content"] == "What do you see?"

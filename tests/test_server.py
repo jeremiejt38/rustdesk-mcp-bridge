@@ -21,6 +21,7 @@ async def test_tools_registered() -> None:
     expected = {
         "get_screen_size",
         "capture_screen",
+        "describe_screen",
         "move_mouse",
         "mouse_click",
         "mouse_down",

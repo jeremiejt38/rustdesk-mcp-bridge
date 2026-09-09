@@ -7,6 +7,7 @@ import io
 from dataclasses import dataclass
 from typing import Literal
 
+import httpx
 import mss
 import pyautogui  # type: ignore[import-untyped]
 from PIL import Image
@@ -117,3 +118,35 @@ class DesktopController:
             self._pyautogui.press(parts[0])
         else:
             self._pyautogui.hotkey(*parts)
+
+    def describe_screen(
+        self,
+        prompt: str = "Describe this screenshot.",
+        model: str = "llava:7b",
+        ollama_url: str = "http://localhost:11434/api/chat",
+    ) -> str:
+        """Capture the screen and ask a local Ollama vision model to describe it.
+
+        Args:
+            prompt: The question/prompt sent to the vision model.
+            model: Ollama model name supporting vision.
+            ollama_url: Full URL to Ollama chat endpoint.
+
+        Returns:
+            The model's text response.
+        """
+        image_data = self.capture_screen(format="jpeg", quality=85).split(",", 1)[1]
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_data],
+                }
+            ],
+            "stream": False,
+        }
+        response = httpx.post(ollama_url, json=payload, timeout=120.0)
+        response.raise_for_status()
+        return str(response.json()["message"]["content"])

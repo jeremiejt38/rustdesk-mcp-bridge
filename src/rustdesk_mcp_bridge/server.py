@@ -94,6 +94,18 @@ def send_key(key: str) -> str:
     return f"Sent key: {key}"
 
 
+@mcp.tool()
+def describe_screen(
+    prompt: str = "Describe this screenshot in detail.",
+    model: str = "llava:7b",
+) -> str:
+    """Capture the screen and describe it using a local Ollama vision model.
+
+    Useful to locate UI elements before clicking.
+    """
+    return _get_controller().describe_screen(prompt=prompt, model=model)
+
+
 def main(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8765) -> None:
     """Run the MCP server.
 

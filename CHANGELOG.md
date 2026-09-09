@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### feat
 
+- Add `describe_screen` tool that captures the screen and asks a local Ollama vision model (e.g. `llava:7b`) to describe it.
 - Add HTTP transport support with `--transport`, `--host` and `--port` CLI options.
 - Add MCP server with screen capture, mouse and keyboard automation tools.
 
