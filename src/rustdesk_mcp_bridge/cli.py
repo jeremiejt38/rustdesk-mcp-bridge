@@ -14,8 +14,25 @@ def main(argv: list[str] | None = None) -> int:
         prog="rustdesk-mcp-bridge",
         description="MCP server for local desktop automation (screen capture, mouse, keyboard).",
     )
-    parser.parse_args(argv)
-    server_main()
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="MCP transport to use (default: stdio).",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="HTTP bind host (default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="HTTP bind port (default: 8765).",
+    )
+    args = parser.parse_args(argv)
+    server_main(transport=args.transport, host=args.host, port=args.port)
     return 0
 
 

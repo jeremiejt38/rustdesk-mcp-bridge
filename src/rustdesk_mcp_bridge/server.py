@@ -94,6 +94,15 @@ def send_key(key: str) -> str:
     return f"Sent key: {key}"
 
 
-def main() -> None:
-    """Run the MCP server over stdio."""
-    mcp.run()
+def main(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8765) -> None:
+    """Run the MCP server.
+
+    Args:
+        transport: ``stdio`` or ``http``.
+        host: HTTP bind host.
+        port: HTTP bind port.
+    """
+    if transport == "http":
+        mcp.run(transport="http", host=host, port=port)
+    else:
+        mcp.run()
