@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import anyio
 from fastmcp import FastMCP
 
 from .desktop import DesktopController
@@ -101,22 +102,25 @@ def list_monitors() -> list[dict[str, int]]:
 
 
 @mcp.tool()
-def capture_monitor(
+async def capture_monitor(
     monitor_index: int,
     prompt: str | None = None,
     model: str = "llava:7b",
 ) -> str:
     """Capture a specific monitor by index. Optionally describe it with a vision model."""
-    image = _get_controller().capture_screen(
+    controller = _get_controller()
+    image = controller.capture_screen(
         monitor_index=monitor_index, format="jpeg", quality=85
     )
     if prompt is None:
         return image
-    return _get_controller().describe_image(image, prompt=prompt, model=model)
+    return await anyio.to_thread.run_sync(
+        controller.describe_image, image, prompt, model
+    )
 
 
 @mcp.tool()
-def describe_screen(
+async def describe_screen(
     prompt: str = "Describe this screenshot in detail.",
     model: str = "llava:7b",
 ) -> str:
@@ -124,11 +128,13 @@ def describe_screen(
 
     Useful to locate UI elements before clicking.
     """
-    return _get_controller().describe_screen(prompt=prompt, model=model)
+    return await anyio.to_thread.run_sync(
+        _get_controller().describe_screen, prompt, model
+    )
 
 
 @mcp.tool()
-def locate_element(
+async def locate_element(
     target: str,
     model: str = "llava:7b",
     monitor_index: int | None = None,
@@ -137,8 +143,8 @@ def locate_element(
 
     Returns absolute screen coordinates (x, y) that can be passed to move_mouse.
     """
-    return _get_controller().locate_element(
-        target=target, model=model, monitor_index=monitor_index
+    return await anyio.to_thread.run_sync(
+        _get_controller().locate_element, target, model, monitor_index
     )
 
 

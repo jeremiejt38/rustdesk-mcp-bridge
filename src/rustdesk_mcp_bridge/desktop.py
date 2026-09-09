@@ -160,9 +160,28 @@ class DesktopController:
             ],
             "stream": False,
         }
-        response = httpx.post(ollama_url, json=payload, timeout=180.0)
+        response = httpx.post(ollama_url, json=payload, timeout=300.0)
         response.raise_for_status()
         return str(response.json()["message"]["content"])
+
+    async def _ollama_vision_query_async(
+        self,
+        prompt: str,
+        image_data: str | None = None,
+        model: str = "llava:7b",
+        ollama_url: str = "http://localhost:11434/api/chat",
+    ) -> str:
+        """Asynchronous variant of ``_ollama_vision_query`` for the HTTP server."""
+        import anyio
+
+        return await anyio.to_thread.run_sync(
+            self._ollama_vision_query,
+            prompt,
+            image_data,
+            model,
+            ollama_url,
+            limiter=anyio.CapacityLimiter(1),
+        )
 
     def describe_image(
         self,
