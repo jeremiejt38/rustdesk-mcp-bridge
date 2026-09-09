@@ -178,15 +178,35 @@ class DesktopController:
             A dict with integer keys ``x`` and ``y`` representing the center of
             the element in full-screen coordinates.
         """
+        width = self.get_screen_size().width
+        height = self.get_screen_size().height
         prompt = (
-            f"In this screenshot, locate the UI element labeled '{target}'. "
-            "Estimate the center point of that element in absolute pixel coordinates "
-            "for the full screenshot. Reply ONLY with a JSON object like "
-            '{"x": 123, "y": 456}. No explanation.'
+            f"In this {width}x{height} screenshot, locate the UI element labeled '{target}'. "
+            "Return the axis-aligned bounding box of that element as normalized "
+            "coordinates [x_min, y_min, x_max, y_max] where each value is between 0 and 1, "
+            "with (0,0) top-left and (1,1) bottom-right. Reply ONLY with the JSON array."
         )
         raw = self._ollama_vision_query(prompt, model=model, ollama_url=ollama_url)
-        # First try to find a JSON object. Some models omit braces, so fall back
-        # to extracting the first two integer values after "x" and "y" labels.
+        return self._parse_bounding_box(raw, width, height)
+
+    def _parse_bounding_box(self, raw: str, width: int, height: int) -> dict[str, int]:
+        """Parse a model response containing a bounding box and return center coords."""
+        # Try a JSON array first: [x_min, y_min, x_max, y_max]
+        import re
+
+        array_pattern = (
+            r"\[\s*(\d?\.?\d+)\s*,\s*(\d?\.?\d+)\s*,"
+            r"\s*(\d?\.?\d+)\s*,\s*(\d?\.?\d+)\s*\]"
+        )
+        array_match = re.search(array_pattern, raw)
+        if array_match:
+            x_min, y_min, x_max, y_max = (float(v) for v in array_match.groups())
+            return {
+                "x": int(round((x_min + x_max) / 2 * width)),
+                "y": int(round((y_min + y_max) / 2 * height)),
+            }
+
+        # Fall back to a JSON object with x/y center coordinates.
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1 and end > start:
@@ -196,9 +216,10 @@ class DesktopController:
             except Exception:
                 pass
 
-        import re
-
-        match = re.search(r"['\"]?x['\"]?\s*[:=]\s*(\d+).*?['\"]?y['\"]?\s*[:=]\s*(\d+)", raw, re.S)
+        # Last resort: find x= and y= integer values.
+        match = re.search(
+            r"['\"]?x['\"]?\s*[:=]\s*(\d+).*?['\"]?y['\"]?\s*[:=]\s*(\d+)", raw, re.S
+        )
         if match:
             return {"x": int(match.group(1)), "y": int(match.group(2))}
 
