@@ -185,10 +185,21 @@ class DesktopController:
             '{"x": 123, "y": 456}. No explanation.'
         )
         raw = self._ollama_vision_query(prompt, model=model, ollama_url=ollama_url)
-        # Extract JSON object from the response, allowing for surrounding text.
+        # First try to find a JSON object. Some models omit braces, so fall back
+        # to extracting the first two integer values after "x" and "y" labels.
         start = raw.find("{")
         end = raw.rfind("}")
-        if start == -1 or end == -1:
-            raise ValueError(f"Could not parse coordinates from model response: {raw}")
-        coords = json.loads(raw[start : end + 1])
-        return {"x": int(coords["x"]), "y": int(coords["y"])}
+        if start != -1 and end != -1 and end > start:
+            try:
+                coords = json.loads(raw[start : end + 1])
+                return {"x": int(coords["x"]), "y": int(coords["y"])}
+            except Exception:
+                pass
+
+        import re
+
+        match = re.search(r"['\"]?x['\"]?\s*[:=]\s*(\d+).*?['\"]?y['\"]?\s*[:=]\s*(\d+)", raw, re.S)
+        if match:
+            return {"x": int(match.group(1)), "y": int(match.group(2))}
+
+        raise ValueError(f"Could not parse coordinates from model response: {raw}")
