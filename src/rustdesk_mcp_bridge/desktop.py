@@ -44,8 +44,22 @@ class DesktopController:
         monitor = self._mss.monitors[0]
         return Size(width=monitor["width"], height=monitor["height"])
 
+    def list_monitors(self) -> list[dict[str, int]]:
+        """Return the available monitors with their absolute virtual coordinates."""
+        return [
+            {
+                "index": i,
+                "left": monitor["left"],
+                "top": monitor["top"],
+                "width": monitor["width"],
+                "height": monitor["height"],
+            }
+            for i, monitor in enumerate(self._mss.monitors[1:])
+        ]
+
     def capture_screen(
         self,
+        monitor_index: int | None = None,
         region: tuple[int, int, int, int] | None = None,
         format: Literal["png", "jpeg"] = "png",
         quality: int = 85,
@@ -53,6 +67,7 @@ class DesktopController:
         """Capture the screen and return it as a base64-encoded data URI.
 
         Args:
+            monitor_index: Index of the monitor to capture (None = full virtual screen).
             region: Optional (left, top, width, height) rectangle.
             format: Output image format.
             quality: JPEG quality (ignored for PNG).
@@ -60,11 +75,12 @@ class DesktopController:
         Returns:
             Base64 data URI string, e.g. ``data:image/png;base64,...``.
         """
-        monitor = (
-            {"left": region[0], "top": region[1], "width": region[2], "height": region[3]}
-            if region
-            else self._mss.monitors[0]
-        )
+        if region:
+            monitor = {"left": region[0], "top": region[1], "width": region[2], "height": region[3]}
+        elif monitor_index is not None:
+            monitor = self._mss.monitors[monitor_index + 1]
+        else:
+            monitor = self._mss.monitors[0]
         screenshot = self._mss.grab(monitor)
         image = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
 
@@ -123,11 +139,16 @@ class DesktopController:
     def _ollama_vision_query(
         self,
         prompt: str,
+        image_data: str | None = None,
         model: str = "llava:7b",
         ollama_url: str = "http://localhost:11434/api/chat",
     ) -> str:
-        """Capture the screen and ask a local Ollama vision model a question."""
-        image_data = self.capture_screen(format="jpeg", quality=85).split(",", 1)[1]
+        """Ask a local Ollama vision model a question about an image.
+
+        If ``image_data`` is not provided, the current screen is captured first.
+        """
+        if image_data is None:
+            image_data = self.capture_screen(format="jpeg", quality=85).split(",", 1)[1]
         payload = {
             "model": model,
             "messages": [
@@ -142,6 +163,19 @@ class DesktopController:
         response = httpx.post(ollama_url, json=payload, timeout=180.0)
         response.raise_for_status()
         return str(response.json()["message"]["content"])
+
+    def describe_image(
+        self,
+        image_uri: str,
+        prompt: str = "Describe this image.",
+        model: str = "llava:7b",
+        ollama_url: str = "http://localhost:11434/api/chat",
+    ) -> str:
+        """Ask a local Ollama vision model about a provided base64 image URI."""
+        image_data = image_uri.split(",", 1)[1]
+        return self._ollama_vision_query(
+            prompt, image_data=image_data, model=model, ollama_url=ollama_url
+        )
 
     def describe_screen(
         self,
@@ -165,6 +199,7 @@ class DesktopController:
         self,
         target: str,
         model: str = "llava:7b",
+        monitor_index: int | None = None,
         ollama_url: str = "http://localhost:11434/api/chat",
     ) -> dict[str, int]:
         """Capture the screen and locate the center of a UI element by label.
@@ -172,22 +207,39 @@ class DesktopController:
         Args:
             target: Text label of the UI element to find.
             model: Ollama vision model name.
+            monitor_index: Optional monitor index to restrict the search to.
             ollama_url: Full URL to Ollama chat endpoint.
 
         Returns:
             A dict with integer keys ``x`` and ``y`` representing the center of
-            the element in full-screen coordinates.
+            the element in absolute virtual-screen coordinates.
         """
-        width = self.get_screen_size().width
-        height = self.get_screen_size().height
+        if monitor_index is not None:
+            monitor = self._mss.monitors[monitor_index + 1]
+            width = monitor["width"]
+            height = monitor["height"]
+            image = self.capture_screen(
+                monitor_index=monitor_index, format="jpeg", quality=85
+            ).split(",", 1)[1]
+        else:
+            size = self.get_screen_size()
+            width = size.width
+            height = size.height
+            image = None
         prompt = (
             f"In this {width}x{height} screenshot, locate the UI element labeled '{target}'. "
             "Return the axis-aligned bounding box of that element as normalized "
             "coordinates [x_min, y_min, x_max, y_max] where each value is between 0 and 1, "
             "with (0,0) top-left and (1,1) bottom-right. Reply ONLY with the JSON array."
         )
-        raw = self._ollama_vision_query(prompt, model=model, ollama_url=ollama_url)
-        return self._parse_bounding_box(raw, width, height)
+        raw = self._ollama_vision_query(
+            prompt, image_data=image, model=model, ollama_url=ollama_url
+        )
+        box = self._parse_bounding_box(raw, width, height)
+        if monitor_index is not None:
+            box["x"] += monitor["left"]
+            box["y"] += monitor["top"]
+        return box
 
     def _parse_bounding_box(self, raw: str, width: int, height: int) -> dict[str, int]:
         """Parse a model response containing a bounding box and return center coords."""

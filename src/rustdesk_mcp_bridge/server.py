@@ -95,6 +95,27 @@ def send_key(key: str) -> str:
 
 
 @mcp.tool()
+def list_monitors() -> list[dict[str, int]]:
+    """List connected monitors with their absolute virtual coordinates."""
+    return _get_controller().list_monitors()
+
+
+@mcp.tool()
+def capture_monitor(
+    monitor_index: int,
+    prompt: str | None = None,
+    model: str = "llava:7b",
+) -> str:
+    """Capture a specific monitor by index. Optionally describe it with a vision model."""
+    image = _get_controller().capture_screen(
+        monitor_index=monitor_index, format="jpeg", quality=85
+    )
+    if prompt is None:
+        return image
+    return _get_controller().describe_image(image, prompt=prompt, model=model)
+
+
+@mcp.tool()
 def describe_screen(
     prompt: str = "Describe this screenshot in detail.",
     model: str = "llava:7b",
@@ -110,12 +131,15 @@ def describe_screen(
 def locate_element(
     target: str,
     model: str = "llava:7b",
+    monitor_index: int | None = None,
 ) -> dict[str, int]:
     """Locate the center coordinates of a UI element by its visible label.
 
     Returns absolute screen coordinates (x, y) that can be passed to move_mouse.
     """
-    return _get_controller().locate_element(target=target, model=model)
+    return _get_controller().locate_element(
+        target=target, model=model, monitor_index=monitor_index
+    )
 
 
 def main(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8765) -> None:

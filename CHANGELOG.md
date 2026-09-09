@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### feat
 
+- Add `list_monitors` and `capture_monitor` tools to support multi-monitor setups.
+- Add `describe_image` helper for vision analysis of a provided image.
 - Add `locate_element` tool to find the screen coordinates of a UI element by label using a local Ollama vision model.
 - Add `describe_screen` tool that captures the screen and asks a local Ollama vision model (e.g. `llava:7b`) to describe it.
 - Add HTTP transport support with `--transport`, `--host` and `--port` CLI options.
