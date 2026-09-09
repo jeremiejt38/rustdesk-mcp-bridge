@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### feat
+
+- Add MCP server with screen capture, mouse and keyboard automation tools.
+
 ## [0.1.0] - 2026-09-09
 
 ### feat

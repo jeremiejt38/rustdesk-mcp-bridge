@@ -15,7 +15,12 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
 ]
-dependencies = []
+dependencies = [
+    "fastmcp>=3.4.5,<4.0.0",
+    "mss>=9.0.0",
+    "Pillow>=10.0.0",
+    "pyautogui>=0.9.54",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -25,7 +30,7 @@ dev = [
 ]
 
 [project.scripts]
-# rustdesk-mcp-bridge = "rustdesk-mcp-bridge.cli:main"
+rustdesk-mcp-bridge = "rustdesk_mcp_bridge.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
