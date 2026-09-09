@@ -200,11 +200,23 @@ class DesktopController:
         )
         array_match = re.search(array_pattern, raw)
         if array_match:
-            x_min, y_min, x_max, y_max = (float(v) for v in array_match.groups())
-            return {
-                "x": int(round((x_min + x_max) / 2 * width)),
-                "y": int(round((y_min + y_max) / 2 * height)),
-            }
+            return self._center_from_box(array_match.groups(), width, height)
+
+        # Some models wrap the box in a JSON object (possibly keyed by label).
+        for obj_match in re.finditer(r"\{[^\{\}]*\}", raw, re.S):
+            try:
+                obj = json.loads(obj_match.group(0))
+            except Exception:
+                continue
+            if any(isinstance(v, dict) for v in obj.values()):
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        coords = self._extract_box(v)
+                        if coords:
+                            return self._center_from_box(coords, width, height)
+            coords = self._extract_box(obj)
+            if coords:
+                return self._center_from_box(coords, width, height)
 
         # Fall back to a JSON object with x/y center coordinates.
         start = raw.find("{")
@@ -224,3 +236,20 @@ class DesktopController:
             return {"x": int(match.group(1)), "y": int(match.group(2))}
 
         raise ValueError(f"Could not parse coordinates from model response: {raw}")
+
+    def _extract_box(self, data: dict) -> tuple[str, ...] | None:
+        """Return (x_min, y_min, x_max, y_max) from a dict if present."""
+        keys = (("x_min", "y_min", "x_max", "y_max"), ("x1", "y1", "x2", "y2"))
+        for x0, y0, x1, y1 in keys:
+            if x0 in data and y0 in data and x1 in data and y1 in data:
+                return (str(data[x0]), str(data[y0]), str(data[x1]), str(data[y1]))
+        return None
+
+    def _center_from_box(
+        self, values: tuple[str, ...], width: int, height: int
+    ) -> dict[str, int]:
+        x_min, y_min, x_max, y_max = (float(v) for v in values)
+        return {
+            "x": int(round((x_min + x_max) / 2 * width)),
+            "y": int(round((y_min + y_max) / 2 * height)),
+        }
