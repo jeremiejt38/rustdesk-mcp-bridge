@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 from dataclasses import dataclass
 from typing import Literal
 
@@ -119,6 +120,29 @@ class DesktopController:
         else:
             self._pyautogui.hotkey(*parts)
 
+    def _ollama_vision_query(
+        self,
+        prompt: str,
+        model: str = "llava:7b",
+        ollama_url: str = "http://localhost:11434/api/chat",
+    ) -> str:
+        """Capture the screen and ask a local Ollama vision model a question."""
+        image_data = self.capture_screen(format="jpeg", quality=85).split(",", 1)[1]
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_data],
+                }
+            ],
+            "stream": False,
+        }
+        response = httpx.post(ollama_url, json=payload, timeout=180.0)
+        response.raise_for_status()
+        return str(response.json()["message"]["content"])
+
     def describe_screen(
         self,
         prompt: str = "Describe this screenshot.",
@@ -135,18 +159,36 @@ class DesktopController:
         Returns:
             The model's text response.
         """
-        image_data = self.capture_screen(format="jpeg", quality=85).split(",", 1)[1]
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                    "images": [image_data],
-                }
-            ],
-            "stream": False,
-        }
-        response = httpx.post(ollama_url, json=payload, timeout=120.0)
-        response.raise_for_status()
-        return str(response.json()["message"]["content"])
+        return self._ollama_vision_query(prompt, model=model, ollama_url=ollama_url)
+
+    def locate_element(
+        self,
+        target: str,
+        model: str = "llava:7b",
+        ollama_url: str = "http://localhost:11434/api/chat",
+    ) -> dict[str, int]:
+        """Capture the screen and locate the center of a UI element by label.
+
+        Args:
+            target: Text label of the UI element to find.
+            model: Ollama vision model name.
+            ollama_url: Full URL to Ollama chat endpoint.
+
+        Returns:
+            A dict with integer keys ``x`` and ``y`` representing the center of
+            the element in full-screen coordinates.
+        """
+        prompt = (
+            f"In this screenshot, locate the UI element labeled '{target}'. "
+            "Estimate the center point of that element in absolute pixel coordinates "
+            "for the full screenshot. Reply ONLY with a JSON object like "
+            '{"x": 123, "y": 456}. No explanation.'
+        )
+        raw = self._ollama_vision_query(prompt, model=model, ollama_url=ollama_url)
+        # Extract JSON object from the response, allowing for surrounding text.
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start == -1 or end == -1:
+            raise ValueError(f"Could not parse coordinates from model response: {raw}")
+        coords = json.loads(raw[start : end + 1])
+        return {"x": int(coords["x"]), "y": int(coords["y"])}

@@ -106,6 +106,18 @@ def describe_screen(
     return _get_controller().describe_screen(prompt=prompt, model=model)
 
 
+@mcp.tool()
+def locate_element(
+    target: str,
+    model: str = "llava:7b",
+) -> dict[str, int]:
+    """Locate the center coordinates of a UI element by its visible label.
+
+    Returns absolute screen coordinates (x, y) that can be passed to move_mouse.
+    """
+    return _get_controller().locate_element(target=target, model=model)
+
+
 def main(transport: str = "stdio", host: str = "127.0.0.1", port: int = 8765) -> None:
     """Run the MCP server.
 

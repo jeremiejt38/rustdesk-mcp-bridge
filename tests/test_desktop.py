@@ -125,3 +125,21 @@ def test_describe_screen(mock_post: MagicMock, controller: DesktopController) ->
     call_kwargs = mock_post.call_args.kwargs
     assert call_kwargs["json"]["model"] == "llava:7b"
     assert call_kwargs["json"]["messages"][0]["content"] == "What do you see?"
+
+
+@patch("rustdesk_mcp_bridge.desktop.httpx.post")
+def test_locate_element(mock_post: MagicMock, controller: DesktopController) -> None:
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"message": {"content": '{"x": 42, "y": 99}'}}
+    mock_response.raise_for_status.return_value = None
+    mock_post.return_value = mock_response
+
+    raw_bgra = b"\xff\x00\x00\xff\x00\xff\x00\xff"
+    screenshot = MagicMock()
+    screenshot.size = (2, 1)
+    screenshot.bgra = raw_bgra
+    controller._mss.grab.return_value = screenshot
+
+    result = controller.locate_element("Start", model="llava:7b")
+    assert result == {"x": 42, "y": 99}
+    assert "Start" in mock_post.call_args.kwargs["json"]["messages"][0]["content"]

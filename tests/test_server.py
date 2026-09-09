@@ -22,6 +22,7 @@ async def test_tools_registered() -> None:
         "get_screen_size",
         "capture_screen",
         "describe_screen",
+        "locate_element",
         "move_mouse",
         "mouse_click",
         "mouse_down",
